@@ -30,6 +30,259 @@ $('switchBtn').addEventListener('click',()=>switchMode(mode==='login'?'register'
 $('togglePin').addEventListener('click',()=>{const p=$('pin');p.type=p.type==='password'?'text':'password';$('togglePin').setAttribute('aria-label',p.type==='password'?'Show PIN':'Hide PIN');});
 $('forgotBtn').addEventListener('click',()=>showNotice('PIN reset is not enabled yet. For this school project, register a new test account or add verified phone recovery when an SMS provider is configured.','error'));
 async function post(url,data){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await r.json().catch(()=>({error:'Unexpected server response.'}));if(!r.ok)throw new Error(result.error||'Request failed.');return result;}
-$('loginForm').addEventListener('submit',async e=>{e.preventDefault();clearNotice();const phone=phoneValue('phone'),pin=$('pin').value;if(!/^7\d{8}$/.test(phone)){showNotice('Enter a valid Zimbabwe mobile number, e.g. 771234567.');return;}if(!/^\d{4,6}$/.test(pin)){showNotice('Your app PIN must contain 4–6 digits.');return;}const b=$('submitBtn');b.disabled=true;b.textContent='PLEASE WAIT…';try{const r=await post('/api/login',{phone,pin});showNotice(r.message,'success');}catch(err){showNotice(err.message);}finally{b.disabled=false;b.textContent='LOGIN';}});
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();clearNotice();const phone=phoneValue('phone'),pin=$('pin').value;if(!/^7\d{8}$/.test(phone)){showNotice('Enter a valid Zimbabwe mobile number, e.g. 771234567.');return;}if(!/^\d{4,6}$/.test(pin)){showNotice('Your app PIN must contain 4–6 digits.');return;}const b=$('submitBtn');b.disabled=true;b.textContent='PLEASE WAIT…';try{
+const r=await post('/api/login',{phone,pin});
+showNotice(r.message,'success');
+window.location.href='/dashboard';
+  
 $('registerForm').addEventListener('submit',async e=>{e.preventDefault();clearNotice();const phone=phoneValue('newPhone'),pin=$('newPin').value,confirm=$('confirmPin').value;if(!/^7\d{8}$/.test(phone)){showNotice('Enter a valid Zimbabwe mobile number, e.g. 771234567.');return;}if(!/^\d{4,6}$/.test(pin)){showNotice('Choose a PIN with 4–6 digits.');return;}if(pin!==confirm){showNotice('The PINs do not match.');return;}const b=$('registerBtn');b.disabled=true;b.textContent='CREATING…';try{const r=await post('/api/register',{phone,pin});switchMode('login');$('phone').value=phone;showNotice(r.message,'success');}catch(err){showNotice(err.message);}finally{b.disabled=false;b.textContent='CREATE ACCOUNT';}});
-</script></body></html>
+
+<!-- EcoCash Number Two: Loan Calculator -->
+<section id="loan-calculator" style="background:#f3f6fb;padding:24px 16px;font-family:Arial,sans-serif;">
+  <div style="max-width:500px;margin:auto;background:#fff;border-radius:18px;padding:22px;box-shadow:0 4px 16px rgba(0,0,0,.08);">
+
+    <h2 style="color:#1769d2;margin-top:0;">Loan Calculator</h2>
+    <p style="color:#555;">Estimate your loan repayments before applying.</p>
+
+    <form id="ecoLoanCalculator">
+      <label for="ecoLoanAmount">Loan Amount (ZWL)</label>
+      <input
+        id="ecoLoanAmount"
+        type="number"
+        min="1"
+        step="0.01"
+        placeholder="Enter loan amount"
+        required
+        style="display:block;width:100%;box-sizing:border-box;padding:13px;margin:8px 0 16px;border:1px solid #ccd3df;border-radius:9px;"
+      >
+
+      <label for="ecoLoanMonths">Repayment Period</label>
+      <select
+        id="ecoLoanMonths"
+        required
+        style="display:block;width:100%;box-sizing:border-box;padding:13px;margin:8px 0 16px;border:1px solid #ccd3df;border-radius:9px;"
+      >
+        <option value="3">3 months</option>
+        <option value="6">6 months</option>
+        <option value="9">9 months</option>
+        <option value="12">12 months</option>
+      </select>
+
+      <label for="ecoLoanRate">Monthly Interest Rate (%)</label>
+      <input
+        id="ecoLoanRate"
+        type="number"
+        min="0"
+        max="100"
+        step="0.1"
+        value="5"
+        required
+        style="display:block;width:100%;box-sizing:border-box;padding:13px;margin:8px 0 18px;border:1px solid #ccd3df;border-radius:9px;"
+      >
+
+      <button
+        type="submit"
+        style="width:100%;padding:14px;background:#1769d2;color:#fff;border:0;border-radius:10px;font-weight:bold;font-size:16px;"
+      >Calculate Repayment</button>
+    </form>
+
+    <div id="ecoLoanResult" aria-live="polite" style="display:none;margin-top:20px;padding:16px;background:#eef5ff;border-radius:10px;">
+      <p style="margin:0 0 8px;color:#444;">Estimated monthly repayment</p>
+      <h3 id="ecoMonthlyPayment" style="color:#1769d2;margin:0;"></h3>
+      <p id="ecoTotalPayment" style="margin-bottom:0;color:#444;"></p>
+    </div>
+
+    <p style="font-size:12px;color:#777;margin-bottom:0;">
+      Estimates only. The actual rate and fees must be confirmed by the lender.
+    </p>
+  </div>
+</section>
+
+<script>
+(function () {
+  const form = document.getElementById('ecoLoanCalculator');
+  if (!form || form.dataset.ready === 'true') return;
+  form.dataset.ready = 'true';
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    const amount = Number(document.getElementById('ecoLoanAmount').value);
+    const months = Number(document.getElementById('ecoLoanMonths').value);
+    const rate = Number(document.getElementById('ecoLoanRate').value);
+    const result = document.getElementById('ecoLoanResult');
+
+    if (!Number.isFinite(amount) || amount <= 0 ||
+        !Number.isFinite(months) || months <= 0 ||
+        !Number.isFinite(rate) || rate < 0 || rate > 100) {
+      alert('Please enter a valid loan amount and interest rate.');
+      return;
+    }
+
+    // Illustrative estimate using simple interest.
+    const total = amount * (1 + (rate / 100) * months);
+    const monthly = total / months;
+
+    document.getElementById('ecoMonthlyPayment').textContent =
+      'ZWL ' + monthly.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+
+    document.getElementById('ecoTotalPayment').textContent =
+      'Estimated total repayment: ZWL ' +
+      total.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+
+    result.style.display = 'block';
+  });
+})();
+</script>
+<!-- End Loan Calculator -->
+  
+<!-- EcoCash Number Two: Loan Application -->
+<section id="loan-application" style="background:#f3f6fb;padding:24px 16px;font-family:Arial,sans-serif;">
+  <div style="max-width:500px;margin:auto;background:#fff;padding:22px;border-radius:18px;box-shadow:0 4px 16px rgba(0,0,0,.08);">
+
+    <h2 style="color:#1769d2;margin-top:0;">Loan Application</h2>
+    <p style="color:#555;">Complete the three steps to submit your application.</p>
+
+    <div style="display:flex;gap:6px;margin:20px 0;">
+      <div id="appProgress1" style="height:6px;flex:1;background:#d62828;border-radius:5px;"></div>
+      <div id="appProgress2" style="height:6px;flex:1;background:#ddd;border-radius:5px;"></div>
+      <div id="appProgress3" style="height:6px;flex:1;background:#ddd;border-radius:5px;"></div>
+    </div>
+
+    <form id="ecoApplicationForm">
+      <div class="eco-app-step" data-step="1">
+        <h3>Step 1 of 3 — Loan details</h3>
+
+        <label for="appLoanAmount">Loan amount (ZWL)</label>
+        <input id="appLoanAmount" type="number" min="1" step="0.01" required
+          placeholder="Enter loan amount"
+          style="display:block;box-sizing:border-box;width:100%;padding:12px;margin:8px 0 18px;border:1px solid #ccd3df;border-radius:9px;">
+
+        <label for="appLoanPurpose">Purpose of loan</label>
+        <select id="appLoanPurpose" required
+          style="display:block;box-sizing:border-box;width:100%;padding:12px;margin:8px 0 18px;border:1px solid #ccd3df;border-radius:9px;">
+          <option value="">Select purpose</option>
+          <option value="Business">Business</option>
+          <option value="Education">Education</option>
+          <option value="Emergency">Emergency</option>
+          <option value="Personal">Personal</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="eco-app-step" data-step="2" hidden>
+        <h3>Step 2 of 3 — Personal details</h3>
+
+        <label for="appFullName">Full name</label>
+        <input id="appFullName" type="text" autocomplete="name" required
+          placeholder="Enter your full name"
+          style="display:block;box-sizing:border-box;width:100%;padding:12px;margin:8px 0 18px;border:1px solid #ccd3df;border-radius:9px;">
+
+        <label for="appPhone">Zimbabwe phone number</label>
+        <input id="appPhone" type="tel" autocomplete="tel" required
+          pattern="(\+263|0)(7[1-8][0-9]{7}|2[0-9]{8})"
+          placeholder="+263771234567"
+          title="Enter a valid Zimbabwe phone number"
+          style="display:block;box-sizing:border-box;width:100%;padding:12px;margin:8px 0 18px;border:1px solid #ccd3df;border-radius:9px;">
+      </div>
+
+      <div class="eco-app-step" data-step="3" hidden>
+        <h3>Step 3 of 3 — Review</h3>
+        <div id="ecoAppReview" style="background:#f3f6fb;padding:14px;border-radius:10px;line-height:1.8;"></div>
+        <p>Please check your details before submitting.</p>
+        <p style="font-size:12px;color:#666;">This form does not submit an application to a lender until connected to your server.</p>
+      </div>
+
+      <p id="ecoAppMessage" role="status" style="color:#d62828;"></p>
+
+      <div style="display:flex;gap:10px;">
+        <button id="ecoAppBack" type="button" hidden
+          style="flex:1;padding:12px;background:#eee;color:#222;border:0;border-radius:9px;">
+          Back
+        </button>
+        <button id="ecoAppNext" type="button"
+          style="flex:2;padding:12px;background:#1769d2;color:#fff;border:0;border-radius:9px;font-weight:bold;">
+          Continue
+        </button>
+        <button id="ecoAppSubmit" type="submit" hidden
+          style="flex:2;padding:12px;background:#d62828;color:#fff;border:0;border-radius:9px;font-weight:bold;">
+          Submit application
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<script>
+(function () {
+  const form = document.getElementById('ecoApplicationForm');
+  if (!form || form.dataset.ready === 'true') return;
+  form.dataset.ready = 'true';
+
+  let step = 1;
+  const steps = [...form.querySelectorAll('.eco-app-step')];
+  const back = document.getElementById('ecoAppBack');
+  const next = document.getElementById('ecoAppNext');
+  const submit = document.getElementById('ecoAppSubmit');
+  const message = document.getElementById('ecoAppMessage');
+
+  function showStep() {
+    steps.forEach(el => el.hidden = Number(el.dataset.step) !== step);
+    [1, 2, 3].forEach(n => {
+      document.getElementById('appProgress' + n).style.background =
+        n <= step ? '#d62828' : '#ddd';
+    });
+    back.hidden = step === 1;
+    next.hidden = step === 3;
+    submit.hidden = step !== 3;
+    message.textContent = '';
+
+    if (step === 3) {
+      document.getElementById('ecoAppReview').textContent =
+        'Loan amount: ZWL ' +
+        Number(document.getElementById('appLoanAmount').value).toLocaleString('en-US') +
+        ' | Purpose: ' + document.getElementById('appLoanPurpose').value +
+        ' | Name: ' + document.getElementById('appFullName').value +
+        ' | Phone: ' + document.getElementById('appPhone').value;
+    }
+  }
+
+  next.addEventListener('click', () => {
+    const current = steps.find(el => Number(el.dataset.step) === step);
+    const fields = [...current.querySelectorAll('input,select')];
+
+    for (const field of fields) {
+      if (!field.checkValidity()) {
+        field.reportValidity();
+        return;
+      }
+    }
+
+    if (step < 3) {
+      step++;
+      showStep();
+    }
+  });
+
+  back.addEventListener('click', () => {
+    if (step > 1) step--;
+    showStep();
+  });
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    message.textContent =
+      'Your details are ready. Server submission must be connected before your application can be received.';
+  });
+
+  showStep();
+})();
+</script>
+<!-- End Loan Application -->
+  
